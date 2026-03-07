@@ -1,29 +1,43 @@
 const express = require('express')
 let router = express.Router()
-let { GenID, GetCateByID } = require('../utils/IDHandler')
 let slugify = require('slugify')
-let {dataProducts,dataCategories} = require('../utils/data')
+let productSchema = require('../schemas/products')
 
-router.get('/', (req, res) => {
-    let result = dataProducts.filter(
-        function (e) {
-            return !e.isDeleted
+router.get('/', async (req, res) => {
+    let queries = req.query;
+    let minQ = queries.min ? queries.min : 0;
+    let result = await productSchema.find({
+        isDeleted: false,
+        price: {
+            $gte:minQ
         }
+    }).populate(
+        { path: 'category', select: 'name' }
     )
     res.send(result)
 })
-router.get('/:id', (req, res) => {//req.params
-    let result = dataProducts.filter(
-        function (e) {
-            return e.id == req.params.id && !e.isDeleted;
+router.get('/:id', async (req, res) => {//req.params
+    try {
+        let result = await productSchema.findOne({
+            isDeleted: false,
+            _id: req.params.id
+        })
+        if (result) {
+            res.send(result)
+        } else {
+            res.status(404).send({
+                message: "ID NOT FOUND"
+            })
         }
-    )
-    res.send(result)
+    } catch (error) {
+        res.status(404).send({
+            message: "SOMETHING WENT WRONG"
+        })
+    }
 })
 
-router.post('/', (req, res) => {
-    let newProducts = {
-        id: GenID(dataProducts),
+router.post('/', async (req, res) => {
+    let newProducts = new productSchema({
         title: req.body.title,
         slug: slugify(req.body.title, {
             replacement: '-',
@@ -31,48 +45,54 @@ router.post('/', (req, res) => {
             remove: undefined,
         }),
         description: req.body.description,
-        category: GetCateByID(req.body.category, dataCategories),
+        category: req.body.category,
         images: req.body.images,
-        creationAt: new Date(Date.now()),
-        updatedAt: new Date(Date.now())
-    }
-    dataProducts.push(newProducts);
+        price: req.body.price
+    })
+    await newProducts.save()
     res.send(newProducts)
 })
-router.put('/:id', (req, res) => {
-    let getProduct = dataProducts.filter(
-        function (e) {
-            return e.id == req.params.id && !e.isDeleted
-        }
-    )
-    if (getProduct.length > 0) {
-        getProduct = getProduct[0];
-        let keys = Object.keys(req.body);
-        for (const key of keys) {
-            if (getProduct[key]) {
-                getProduct[key] = req.body[key];
+router.put('/:id', async (req, res) => {
+    try {
+        let result = await productSchema.findOne({
+            isDeleted: false,
+            _id: req.params.id
+        })
+        if (result) {
+            let keys = Object.keys(req.body);
+            for (const key of keys) {
+                result[key] = req.body[key]
             }
+            await result.save();
+        } else {
+            res.status(404).send({
+                message: "ID NOT FOUND"
+            })
         }
-        getProduct.updatedAt = new Date(Date.now());
-        res.status(200).send(getProduct)
-    } else {
-        res.status(404).send("id not found")
+    } catch (error) {
+        res.status(404).send({
+            message: "SOMETHING WENT WRONG"
+        })
     }
-
 })
-router.delete('/:id', (req, res) => {
-    let getProduct = dataProducts.filter(
-        function (e) {
-            return e.id == req.params.id && !e.isDeleted
+router.delete('/:id', async (req, res) => {
+    try {
+        let result = await productSchema.findOne({
+            isDeleted: false,
+            _id: req.params.id
+        })
+        if (result) {
+            result.isDeleted = true;
+            await result.save();
+        } else {
+            res.status(404).send({
+                message: "ID NOT FOUND"
+            })
         }
-    )
-    if (getProduct.length > 0) {
-        getProduct = getProduct[0];
-        getProduct.isDeleted = true;
-        getProduct.updatedAt = new Date(Date.now());
-        res.status(200).send(getProduct)
-    } else {
-        res.status(404).send("id not found")
+    } catch (error) {
+        res.status(404).send({
+            message: "SOMETHING WENT WRONG"
+        })
     }
 
 })

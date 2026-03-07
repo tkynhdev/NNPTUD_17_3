@@ -2,7 +2,8 @@ const express = require('express')
 let router = express.Router()
 let { GenID } = require('../utils/IDHandler')
 let slugify = require('slugify')
-let categorySchema = require('../schemas/categories');//DBset/DBContext
+let categorySchema = require('../schemas/categories');
+let productSchema = require('../schemas/products')
 
 
 router.get('/:id', async (req, res) => {//req.params
@@ -24,28 +25,27 @@ router.get('/:id', async (req, res) => {//req.params
         )
     }
 })
-router.get('/', async (req, res) => {//req.params
+router.get('/', async (req, res) => {
+    let queries = req.query;
+    let nameQ = queries.name?queries.name:'';
     let dataCategories = await categorySchema.find({
-        isDeleted: false
-    });
+        isDeleted: false,
+        name:new RegExp(nameQ,'i')
+    }).populate('products')
     res.send(dataCategories)
 })
-router.get('/:id/products', (req, res) => {//req.params
-    let idCate = req.params.id;
-    let filterData = dataCategories.filter(
-        function (e) {
-            return e.id == idCate;
+router.get('/:id/products', async (req, res) => {//req.params
+    let id = req.params.id;
+    let filterData = await categorySchema.findOne(
+        {
+            _id: id,
+            isDeleted: false
         }
-    )
-    if (filterData.length == 0) {
+    ).populate('products')
+    if (!filterData) {
         res.status(404).send("id khong hop le")
     } else {
-        let result = dataProducts.filter(
-            function (e) {
-                return e.category.id == idCate;
-            }
-        )
-        res.send(result)
+        res.send(filterData.products)
     }
 })
 router.post('/', async function (req, res, next) {
