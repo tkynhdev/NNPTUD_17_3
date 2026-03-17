@@ -6,6 +6,9 @@ let { CheckLogin } = require('../utils/authHandler')
 let jwt = require('jsonwebtoken')
 let fs = require('fs')
 
+// Đọc private key để ký token
+const privateKey = fs.readFileSync('./private.key', 'utf8');
+
 router.post('/register', RegisterValidator, validationResult, async function (req, res, next) {
     try {
         let newItem = await userController.CreateAnUser(
@@ -35,10 +38,10 @@ router.post('/login', async function (req, res, next) {
             return;
         }
         let token = jwt.sign({
-            id:result._id
-        },'secretKey',{
-            expiresIn:'1d',
-            algorithm:'RS256'
+            id: result._id
+        }, privateKey, {
+            expiresIn: '1d',
+            algorithm: 'RS256'
         })
         res.cookie("LOGIN_NNPTUD_S3", token, {
             maxAge: 24 * 60 * 60 * 1000,
@@ -60,6 +63,21 @@ router.post('/logout', CheckLogin, function (req, res, next) {
         httpOnly: true
     })
     res.send("da logout ")
+})
+router.post('/changepassword', CheckLogin, async function (req, res, next) {
+    try {
+        let { oldpassword, newpassword } = req.body;
+
+        if (!oldpassword || !newpassword) {
+            res.status(400).send("Vui lòng nhập mật khẩu cũ và mật khẩu mới");
+            return;
+        }
+
+        let result = await userController.ChangePassword(req.user._id, oldpassword, newpassword);
+        res.send(result);
+    } catch (err) {
+        res.status(400).send({ message: err.message });
+    }
 })
 
 module.exports = router;

@@ -1,6 +1,10 @@
 let userController = require('../controllers/users')
 let jwt = require('jsonwebtoken')
 let fs = require('fs')
+
+// Đọc public key để verify token
+const publicKey = fs.readFileSync('./public.key', 'utf8');
+
 module.exports = {
     CheckLogin: async function (req, res, next) {
         let key = req.headers.authorization;
@@ -15,11 +19,10 @@ module.exports = {
         }
 
         try {
-            
-            let result = jwt.verify(key, 'secretKey')
+            let result = jwt.verify(key, publicKey, { algorithms: ['RS256'] })
             if (result.exp * 1000 < Date.now()) {
                 res.status(404).send("ban chua dang nhap")
-                return;s
+                return;
             }
             let user = await userController.GetUserById(result.id);
             if (!user) {
